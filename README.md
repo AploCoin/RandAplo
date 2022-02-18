@@ -1,0 +1,2 @@
+# RandAplo
+RandAplo algorithm
