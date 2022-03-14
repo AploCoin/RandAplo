@@ -19,19 +19,18 @@ fn main() {
                              0xff,0xff,0xff,0xff,0xff];
     let now = Instant::now();
     println!("Generating algorithm");
-    let instructions_lookup = AlgorithmCreator::generate_lookup_table(&mut data.clone());
+    //let instructions_lookup = AlgorithmCreator::generate_lookup_table(&mut data.clone());
     //println!("{:?}",instructions_lookup.len());
     //println!("{:?}",instructions_lookup);
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
-                                                    2147483648,
+                                                    4294967296,
                                                     500,
-                                                    &instructions_lookup,
                                                     5000000
                                                 ).unwrap();
     println!("Algorithm generated seconds:{}", now.elapsed().as_secs());
     println!("{:?}",algorithm.len());
 
-    let instructions_lookup_table = AlgorithmProcessor::prepare_lookup_table(&instructions_lookup);
+    //let instructions_lookup_table = AlgorithmProcessor::prepare_lookup_table(&instructions_lookup);
 
     let bytes_size:[u8;8] = algorithm[0..8].try_into().unwrap();
     let block_size = u64::from_be_bytes(bytes_size);
@@ -56,8 +55,7 @@ fn main() {
                                     &mut stack,
                                     500,
                                     false,
-                                    0,
-                                    &instructions_lookup_table);
+                                    0);
     println!("Algorithm executed seconds:{}", now.elapsed().as_secs());
     println!("{:?}",res);
 

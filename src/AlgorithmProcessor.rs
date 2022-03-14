@@ -32,15 +32,15 @@ fn shift_4_bits_left_stricted(input_vector:&mut Vec<u8>){
     }
 }
 
-pub fn prepare_lookup_table(array:&[u16;42]) -> HashMap<u16,u8>{
-    let mut to_return:HashMap<u16,u8> = HashMap::with_capacity(42);
+// pub fn prepare_lookup_table(array:&[u16;42]) -> HashMap<u16,u8>{
+//     let mut to_return:HashMap<u16,u8> = HashMap::with_capacity(42);
 
-    for i in 0..42{
-        to_return.insert(array[i],i as u8);
-    }
+//     for i in 0..42{
+//         to_return.insert(array[i],i as u8);
+//     }
 
-    return to_return;
-}
+//     return to_return;
+// }
 
 pub fn pad_data(data:&mut VecDeque<u8>,size:u64){
     let mut initial_size:u64 = data.len() as u64;
@@ -100,12 +100,11 @@ impl VM{
                         stack:&mut VecDeque<u8>,
                         output_max_size:usize,
                         debug:bool,
-                        breakpoint:usize,
-                        opcode_lookup_table:&HashMap<u16,u8>) -> Result<(),&'static str>{
+                        breakpoint:usize) -> Result<(),&'static str>{
         // will change stack variable
 
         
-        let mut instruction_opcode:u16;
+        let mut instruction_opcode:u8;
         let mut in_debugging:bool;
         let bitwise_max_size:u16 = 15;
 
@@ -115,11 +114,10 @@ impl VM{
             println!("Stack: {}",stack.len());
             while instruction_index != buffer.len()
                     && stack.len() > output_max_size{
-                instruction_opcode = (buffer[instruction_index]as u16) <<8;
-                instruction_opcode += buffer[instruction_index+1] as u16;
 
-                let instruction_code = opcode_lookup_table.get(&instruction_opcode).unwrap();
-                instruction_index += 2;
+                instruction_opcode = buffer[instruction_index];
+
+                instruction_index += 1;
                 instruction_counter += 1;
 
 
@@ -127,14 +125,14 @@ impl VM{
                 if debug && instruction_counter == breakpoint{
                     println!("Breakpoint at {} instruction",breakpoint);
                     println!("Debug Data:");
-                    println!("Instruction Code: {}",instruction_code);
+                    println!("Instruction Code: {}",instruction_opcode);
                     println!("Instruction Index: {}",instruction_index);
                     println!("Initial Stack size: {}",stack.len());
                     println!("Instruction Data:");
                     in_debugging = true;
                 }
 
-                match instruction_code{
+                match instruction_opcode{
                     0 => {
                         let mut N:u16 = (buffer[instruction_index] as u16) << 8;
                         N += buffer[instruction_index+1] as u16;
@@ -819,7 +817,7 @@ impl VM{
                             println!("Resulting bytes: {:X?}",resulting_bytes);
 
                             if res_bytes_length > N as usize{
-                                for i in (res_bytes_length-N as usize..res_bytes_length){
+                                for i in res_bytes_length-N as usize..res_bytes_length{
                                     stack.push_back(resulting_bytes[i]);
                                 }
                             }else{
@@ -852,7 +850,7 @@ impl VM{
                             }
 
                             if res_bytes_length > N as usize{
-                                for i in (res_bytes_length-N as usize..res_bytes_length){
+                                for i in res_bytes_length-N as usize..res_bytes_length{
                                     stack.push_back(resulting_bytes[i]);
                                 }
                             }else{
@@ -876,7 +874,7 @@ impl VM{
                         let second_operand:f32 = f32::from_be_bytes(static_array);
                         let mut result:f32;
 
-                        match instruction_code{
+                        match instruction_opcode{
                             8 =>{result = first_operand+second_operand}
                             10 =>{result = first_operand*second_operand}
                             12 =>{result = first_operand-second_operand}
@@ -932,7 +930,7 @@ impl VM{
 
                         let mut result:f32;
 
-                        match instruction_code{
+                        match instruction_opcode{
                             9 =>{result = first_operand+second_operand}
                             11 =>{result = first_operand*second_operand}
                             13 =>{result = first_operand-second_operand}
@@ -948,7 +946,7 @@ impl VM{
                                 //overflow
                                 println!("Overflow encountered");
                                 print!("Adding bytes to stack: ");
-                                for i in (instruction_index..instruction_index+4){
+                                for i in instruction_index..instruction_index+4{
                                     stack.push_back(buffer[i]);
                                     print!("{:X}",buffer[i]);
                                 }  
@@ -961,7 +959,7 @@ impl VM{
                         }else{
                             if !result.is_finite() || result == 0.0{
                                 //overflow
-                                for i in (instruction_index..instruction_index+4){
+                                for i in instruction_index..instruction_index+4{
                                     stack.push_back(buffer[i]);
                                 }  
                             }else{
@@ -987,7 +985,7 @@ impl VM{
                         let second_operand:f64 = f64::from_be_bytes(static_array);
                         let mut result:f64;
 
-                        match instruction_code{
+                        match instruction_opcode{
                             16 =>{result = first_operand+second_operand}
                             18 =>{result = first_operand*second_operand}
                             20 =>{result = first_operand-second_operand}
@@ -1043,7 +1041,7 @@ impl VM{
 
                         let mut result:f64;
 
-                        match instruction_code{
+                        match instruction_opcode{
                             17 =>{result = first_operand+second_operand}
                             19 =>{result = first_operand*second_operand}
                             21 =>{result = first_operand-second_operand}
@@ -1059,7 +1057,7 @@ impl VM{
                                 //overflow
                                 println!("Overflow encountered");
                                 print!("Adding bytes to stack: ");
-                                for i in (instruction_index..instruction_index+8){
+                                for i in instruction_index..instruction_index+8{
                                     stack.push_back(buffer[i]);
                                     print!("{:X}",buffer[i]);
                                 }  
@@ -1072,7 +1070,7 @@ impl VM{
                         }else{
                             if !result.is_finite() || result == 0.0{
                                 //overflow
-                                for i in (instruction_index..instruction_index+8){
+                                for i in instruction_index..instruction_index+8{
                                     stack.push_back(buffer[i]);
                                 }  
                             }else{
@@ -1105,7 +1103,7 @@ impl VM{
                             println!("Second Operand: {:X?}",second_operand);
                             print!("Result: ");
                             for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_code{
+                                match instruction_opcode{
                                     24 =>{stack.push_front(*first|*second);
                                             print!("{}",*first|*second);}
                                     26 =>{stack.push_front(*first&*second);
@@ -1119,7 +1117,7 @@ impl VM{
                         }
                         else{
                             for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_code{
+                                match instruction_opcode{
                                     24 =>{stack.push_front(*first|*second)}
                                     26 =>{stack.push_front(*first&*second)}
                                     28 =>{stack.push_front(*first^*second)}
@@ -1148,7 +1146,7 @@ impl VM{
                             println!("Second Operand: {:X?}",second_operand);
                             print!("Result: ");
                             for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_code{
+                                match instruction_opcode{
                                     25 =>{stack.push_back(*first|*second);
                                             print!("{}",*first|*second);}
                                     27 =>{stack.push_back(*first&*second);
@@ -1162,7 +1160,7 @@ impl VM{
                         }
                         else{
                             for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_code{
+                                match instruction_opcode{
                                     25 =>{stack.push_back(*first|*second)}
                                     27 =>{stack.push_back(*first&*second)}
                                     29 =>{stack.push_back(*first^*second)}
@@ -1532,7 +1530,7 @@ impl VM{
                         println!("Unknown instruction {} 
                                     Last index: {}
                                     Instruction pos: {}",
-                                    instruction_code,
+                                    instruction_opcode,
                                     instruction_index,
                                     instruction_counter);
                         return Err("Unknown instruction");

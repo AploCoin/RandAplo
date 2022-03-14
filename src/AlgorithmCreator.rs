@@ -55,7 +55,6 @@ pub fn generate_lookup_table<'a>(seed:&mut [u8]) -> [u16;AMOUNT_OF_INSTRUCTIONS]
 pub fn create_algorithm(seed:&mut [u8],
                         min_inp_batch:u64,
                         result_size:u64,
-                        lookup_table:&[u16;AMOUNT_OF_INSTRUCTIONS],
                         minimal_instructions:u64
                     ) -> Result<Vec<u8>,&'static str>{
 
@@ -96,7 +95,7 @@ pub fn create_algorithm(seed:&mut [u8],
                 
         instruction = Tools::biguint_into_u8(rng.generate()%AMOUNT_OF_EXE_INSTRUCTIONS);
         
-        let instruction_opcode:u16 = lookup_table[instruction as usize];
+        let instruction_opcode:u8 = instruction;
 
         match instruction{
             0|1 => {
@@ -105,7 +104,7 @@ pub fn create_algorithm(seed:&mut [u8],
                 }
                 static_values_counter += 1;
 
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 
                 let mut N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%static_values_max_size);
                 //println!("N: {}",N);
@@ -139,7 +138,7 @@ pub fn create_algorithm(seed:&mut [u8],
 
             }
             2|3|4|5 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 //algorithm.push(instruction);
 
                 let amount_of_bytes:u16 = 1 + Tools::biguint_into_u16(rng.generate()%size_koef);
@@ -155,7 +154,7 @@ pub fn create_algorithm(seed:&mut [u8],
                 current_stack_size -= min_amount_of_bytes as u64;
             }
             6|7 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 let N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%size_koef);
                 
                 algorithm.push(((N&0xff00)>>8) as u8);
@@ -164,29 +163,29 @@ pub fn create_algorithm(seed:&mut [u8],
                 current_stack_size -= N as u64;
             }
             8|9|10|11|12|13|14|15 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 let overflow_bytes:u32 = Tools::biguint_into_u32(rng.generate());
                 push_u_to_u8_vec!(algorithm,overflow_bytes);
 
                 current_stack_size -= 4;
             }
             16|17|18|19|20|21|22|23 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 let overflow_bytes:u64 = Tools::biguint_into_u64(rng.generate());
                 push_u_to_u8_vec!(algorithm,overflow_bytes);
 
                 current_stack_size -= 8;
             }
             24|25|26|27|28|29 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 current_stack_size -= bitwise_max_size as u64 + 2;
             }
             30|31 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 current_stack_size -= 2;
             }
             32|33 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 let mut S:u8 = Tools::biguint_into_u8(rng.generate())%bitwise_left_shift_limit as u8;
 
                 algorithm.push(S);
@@ -197,7 +196,7 @@ pub fn create_algorithm(seed:&mut [u8],
                 }
             }
             34|35 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 let mut S:u8 = Tools::biguint_into_u8(rng.generate())%bitwise_right_shift_limit;
                 algorithm.push(S);
                 while S >=8 {
@@ -206,7 +205,7 @@ pub fn create_algorithm(seed:&mut [u8],
                 }
             }
             36|37|38|39 => {
-                push_u16_to_u8_vec!(algorithm,instruction_opcode);
+                algorithm.push(instruction_opcode);
                 current_stack_size -= 4;
             }
             _ => {continue;}
@@ -214,7 +213,7 @@ pub fn create_algorithm(seed:&mut [u8],
         instruction_number += 1;
     }   
     println!("Instruction number: {}",instruction_number);
-    push_u16_to_u8_vec!(algorithm,lookup_table[40]);
+    algorithm.push(40);
     // algorithm.push(lookup_table[40]);
     return Ok(algorithm);
 }
