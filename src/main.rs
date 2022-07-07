@@ -6,6 +6,7 @@ mod AlgorithmCreator;
 mod AlgorithmProcessor;
 use std::iter::FromIterator;
 use std::convert::TryInto;
+use sha2::{Sha256, Digest};
 
 pub fn cast_slice_to_array(data: &[u8]) -> [u8;8]{
     return data.try_into().unwrap();
@@ -25,7 +26,7 @@ fn main() {
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
                                                     2147483648,
                                                     500,
-                                                    5000000
+                                                    10000000
                                                 ).unwrap();
     println!("Algorithm generated seconds:{}", now.elapsed().as_secs());
     println!("{:?}",algorithm.len());
@@ -53,14 +54,19 @@ fn main() {
     let now = Instant::now();
     let res = vm.execute_from_buffer(&algorithm[8..], 
                                     &mut stack,
-                                    500,
+                                    1024,
                                     false,
                                     0);
     println!("Algorithm executed seconds:{}", now.elapsed().as_secs());
     println!("{:?}",res);
 
     let mut digest:Vec<u8> = vm.digest();
-    println!("{:?}",digest.len());
-    println!("{:X?}",digest);
+    
+    let mut hasher = Sha256::new();
+    hasher.update(digest);
+    let result = hasher.finalize();
+    println!("{:?}",result);
+    // println!("{:?}",digest.len());
+    // println!("{:X?}",digest);
     
 }
