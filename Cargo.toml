@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 md5 = "0.7.0"
 num-bigint = "0.1"
+aes = "0.8.1"

@@ -24,8 +24,8 @@ macro_rules! push_u_to_u8_vec{
 
 
 
-const AMOUNT_OF_EXE_INSTRUCTIONS:usize = 42;
-const AMOUNT_OF_INSTRUCTIONS:usize = 42;
+const AMOUNT_OF_EXE_INSTRUCTIONS:usize = 49;
+const AMOUNT_OF_INSTRUCTIONS:usize = 49;
 static MAX_INSTRUCTION_SIZE:u64 = 65536;
 
 pub fn generate_lookup_table<'a>(seed:&mut [u8]) -> [u16;AMOUNT_OF_INSTRUCTIONS]{
@@ -208,12 +208,28 @@ pub fn create_algorithm(seed:&mut [u8],
                 algorithm.push(instruction_opcode);
                 current_stack_size -= 4;
             }
+            40|41 =>{
+                algorithm.push(instruction_opcode);
+                current_stack_size -= 16;
+            }
+            42|43 =>{
+                algorithm.push(instruction_opcode);
+                current_stack_size -= 24;
+            }
+            44|45 =>{
+                algorithm.push(instruction_opcode);
+                current_stack_size -= 32;
+            }
+            46 =>{
+                algorithm.push(instruction_opcode);
+            }
             _ => {continue;}
         }
         instruction_number += 1;
     }   
     println!("Instruction number: {}",instruction_number);
-    algorithm.push(40);
+    algorithm.push(46);
+    algorithm.push(47);
     // algorithm.push(lookup_table[40]);
     return Ok(algorithm);
 }

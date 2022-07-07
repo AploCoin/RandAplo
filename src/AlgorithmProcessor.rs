@@ -6,6 +6,14 @@ use std::mem::transmute;
 use crate::RNG::MurMur2RNG;
 use std::iter::FromIterator;
 
+use aes::Aes128;
+use aes::Aes192;
+use aes::Aes256;
+use aes::cipher::{
+    BlockCipher, BlockEncrypt, BlockDecrypt, KeyInit,
+    generic_array::GenericArray,
+};
+
 fn pause() {
     let mut stdout = stdout();
     stdout.write(b"Press Enter to continue...").unwrap();
@@ -31,16 +39,6 @@ fn shift_4_bits_left_stricted(input_vector:&mut Vec<u8>){
         carry = (new_bytes>>8) as u8;
     }
 }
-
-// pub fn prepare_lookup_table(array:&[u16;42]) -> HashMap<u16,u8>{
-//     let mut to_return:HashMap<u16,u8> = HashMap::with_capacity(42);
-
-//     for i in 0..42{
-//         to_return.insert(array[i],i as u8);
-//     }
-
-//     return to_return;
-// }
 
 pub fn pad_data(data:&mut VecDeque<u8>,size:u64){
     let mut initial_size:u64 = data.len() as u64;
@@ -1506,6 +1504,146 @@ impl VM{
                         stack.push_back((result&0x000000ff) as u8);
                     }
                     40 => {
+                        // aes128 encrypt front
+                        let mut key_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes128::new(&key);
+                        cipher.encrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    41 => {
+                        // aes128 decrypt front
+                        let mut key_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes128::new(&key);
+                        cipher.decrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    42 => {
+                        // aes192 encrypt front
+                        let mut key_raw:[u8;24] = [0u8;24];
+                        for i in 0..24{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes192::new(&key);
+                        cipher.encrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    43 => {
+                        // aes192 decrypt front
+                        let mut key_raw:[u8;24] = [0u8;24];
+                        for i in 0..24{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes192::new(&key);
+                        cipher.decrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    44 => {
+                        // aes256 encrypt front
+                        let mut key_raw:[u8;32] = [0u8;32];
+                        for i in 0..32{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes256::new(&key);
+                        cipher.encrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    45 => {
+                        // aes256 decrypt front
+                        let mut key_raw:[u8;32] = [0u8;32];
+                        for i in 0..32{
+                            key_raw[i] = stack.pop_front().unwrap();
+                        }
+                        let key = GenericArray::from(key_raw);
+                        
+                        let mut block_raw:[u8;16] = [0u8;16];
+                        for i in 0..16{
+                            key_raw[i] = stack.pop_back().unwrap();
+                        }
+
+                        let mut block = GenericArray::from(block_raw);
+                        
+                        let cipher = Aes256::new(&key);
+                        cipher.decrypt_block(&mut block);
+
+                        for num in block.iter(){
+                            stack.push_front(*num);
+                        }
+                    }
+                    46 => {
+                        // pop 4 bytes from back push to front
+
+                        for _ in 0..4{
+                            let num  = stack.pop_back().unwrap();
+                            stack.push_front(num);
+                        }
+                    }
+                    47 => {
                         // pop 4 bytes from back, push to final state
                         let mut value:u32 = 0;
 
@@ -1516,7 +1654,7 @@ impl VM{
 
                         self.final_state.push(value);
                     }
-                    41 => {
+                    48 => {
                         let mut value:u32 = 0;
 
                         value |= (stack.pop_front().unwrap() as u32)<<24;

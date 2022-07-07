@@ -23,7 +23,7 @@ fn main() {
     //println!("{:?}",instructions_lookup.len());
     //println!("{:?}",instructions_lookup);
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
-                                                    4294967296,
+                                                    2147483648,
                                                     500,
                                                     5000000
                                                 ).unwrap();
