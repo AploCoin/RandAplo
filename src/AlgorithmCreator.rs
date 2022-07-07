@@ -64,7 +64,7 @@ pub fn create_algorithm(seed:&mut [u8],
         Tools::biguint_into_u64(rng.generate()%1000usize);
 
     let size_koef:u32 = 100;
-    let static_values_max_size:u32 = 0xffff;
+    let static_values_max_size:u32 = 20;
 
     let bitwise_right_shift_limit:u8 = 8;
 

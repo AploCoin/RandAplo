@@ -109,7 +109,7 @@ impl VM{
         while stack.len() > output_max_size{
             let mut instruction_index:usize = 0;
             let mut instruction_counter:usize = 0;
-            println!("Stack: {}",stack.len());
+            //println!("Stack: {}",stack.len());
             while instruction_index != buffer.len()
                     && stack.len() > output_max_size{
 

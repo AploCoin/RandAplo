@@ -15,9 +15,9 @@ pub fn cast_slice_to_array(data: &[u8]) -> [u8;8]{
 
 fn main() {    
     let mut data:[u8;20] = [0xff,0xff,0xff,0xff,0xff,
+                             0xff,0xfa,0xff,0xff,0xff,
                              0xff,0xff,0xff,0xff,0xff,
-                             0xff,0xff,0xff,0xff,0xff,
-                             0xff,0xff,0xff,0xff,0xff];
+                             0xff,0xff,0xff,0xff,0x00];
     let now = Instant::now();
     println!("Generating algorithm");
     //let instructions_lookup = AlgorithmCreator::generate_lookup_table(&mut data.clone());
@@ -25,8 +25,8 @@ fn main() {
     //println!("{:?}",instructions_lookup);
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
                                                     2147483648,
-                                                    500,
-                                                    10000000
+                                                    1073741824/2,
+                                                    10000
                                                 ).unwrap();
     println!("Algorithm generated seconds:{}", now.elapsed().as_secs());
     println!("{:?}",algorithm.len());
@@ -41,9 +41,9 @@ fn main() {
     let mut stack:VecDeque<u8> = VecDeque::with_capacity((block_size/4) as usize);
 
     for i in 0..6{
-        stack.push_back(0xFF);
+        stack.push_back(0xFA);
     }
-    stack[0] = 0xff;
+    //stack[0] = 0xff;
     
     println!("Padding data...");
     AlgorithmProcessor::pad_data(&mut stack, block_size);
@@ -54,7 +54,7 @@ fn main() {
     let now = Instant::now();
     let res = vm.execute_from_buffer(&algorithm[8..], 
                                     &mut stack,
-                                    1024,
+                                    1073741824/2,
                                     false,
                                     0);
     println!("Algorithm executed seconds:{}", now.elapsed().as_secs());
