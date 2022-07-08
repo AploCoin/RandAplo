@@ -63,10 +63,16 @@ Number | Arguments | Description
 38||Same with 36, but subtraction(Front)
 39||Same with 47, but subtraction(Back)
 |||
+||**AES instructions**|
+|||
+40||AES128 encrypt, pop key(128 bites) from front and block(128 bites) from back, encrypt, push result to front
+41||AES128 decrypt, same with 40, but decryption
+42-46||AES192, AES256
+|||
 ||**Digest operations**|
 |||
-40||Pops 32bit integer from back(big-endian), pushes to final state
-41||Same with 41, but pushes/pops to/from front
+47||Pops 32bit integer from back(big-endian), pushes to final state
+48||Same with 41, but pushes/pops to/from front
 
 
 # Algorithm Execution
