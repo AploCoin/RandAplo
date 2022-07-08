@@ -103,7 +103,6 @@ impl VM{
 
         
         let mut instruction_opcode:u8;
-        let mut in_debugging:bool;
         let bitwise_max_size:u16 = 15;
 
         while stack.len() > output_max_size{
@@ -118,18 +117,6 @@ impl VM{
                 instruction_index += 1;
                 instruction_counter += 1;
 
-
-                in_debugging = false;
-                if debug && instruction_counter == breakpoint{
-                    println!("Breakpoint at {} instruction",breakpoint);
-                    println!("Debug Data:");
-                    println!("Instruction Code: {}",instruction_opcode);
-                    println!("Instruction Index: {}",instruction_index);
-                    println!("Initial Stack size: {}",stack.len());
-                    println!("Instruction Data:");
-                    in_debugging = true;
-                }
-
                 match instruction_opcode{
                     0 => {
                         let mut N:u16 = (buffer[instruction_index] as u16) << 8;
@@ -140,11 +127,6 @@ impl VM{
                         for i in 0..N{
                             stack.push_back(buffer[instruction_index]);
                             instruction_index += 1;
-                        }
-
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
                         }
                     }
                     1 => {
@@ -161,11 +143,6 @@ impl VM{
                             stack.push_front(buffer[instruction_index+i]);
                         }
                         instruction_index += N as usize;
-
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                        }
 
                     }
                     2 => {
@@ -215,32 +192,16 @@ impl VM{
                         }
                         shift_4_bits_left_stricted(&mut second_operand);
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:?}",first_operand);
-                            println!("Second operand: {:?}",second_operand);
-                            print!("Result: ");
-                            let mut carry:u8 = 0;
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                let result:u16 = *first as u16 
-                                                    + *second as u16 
-                                                    + carry as u16;
-                                print!("{:X}",result&0xff);
-                                carry = (result>>8) as u8;
-                                stack.push_front((result&0x00ff) as u8);
-                            }
-                            print!("\n");
-                        }else{
-                            let mut carry:u8 = 0;
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                let result:u16 = *first as u16 
-                                                    + *second as u16 
-                                                    + carry as u16;
-                                carry = (result>>8) as u8;
-                                stack.push_front((result&0x00ff) as u8);
-                            }
+                        
+                        let mut carry:u8 = 0;
+                        for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
+                            let result:u16 = *first as u16 
+                                            + *second as u16 
+                                            + carry as u16;
+                            carry = (result>>8) as u8;
+                            stack.push_front((result&0x00ff) as u8);
                         }
+                        
 
                     }
                     3 => {
@@ -293,34 +254,16 @@ impl VM{
                         let mut resulting_bytes:Vec<u8> = Vec::with_capacity(min_amount_of_bytes as usize);
 
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:?}",first_operand);
-                            println!("Second operand: {:?}",second_operand);
-                            print!("Result: ");
-                            let mut carry:u8 = 0;
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                let result:u16 = *first as u16 
-                                                    + *second as u16 
-                                                    + carry as u16;
-                                print!("{:X}",result&0xff);
-                                carry = (result>>8) as u8;
-                                resulting_bytes.push((result&0x00ff) as u8);
-                                //stack.push_back((result&0xff) as u8);
-                            }
-                            print!("\n");
-                        }else{
-                            let mut carry:u8 = 0;
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                let result:u16 = *first as u16 
-                                                    + *second as u16 
-                                                    + carry as u16;
-                                carry = (result>>8) as u8;
-                                resulting_bytes.push((result&0x00ff) as u8);
-                                //stack.push_back((result&0xff) as u8);
-                            }
+                        
+                        let mut carry:u8 = 0;
+                        for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
+                            let result:u16 = *first as u16 
+                                            + *second as u16 
+                                            + carry as u16;
+                            carry = (result>>8) as u8;
+                            resulting_bytes.push((result&0x00ff) as u8);
                         }
+                        
                         for byte in resulting_bytes.iter().rev(){
                             stack.push_back(*byte);
                         }
@@ -372,128 +315,60 @@ impl VM{
                         }
                         shift_4_bits_left_stricted(&mut second_operand);
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second operand: {:X?}",second_operand);
-                            let mut first_operand_big:BigInt;
-                            let mut second_operand_big:BigInt;
+                        let mut first_operand_big:BigInt;
+                        let mut second_operand_big:BigInt;
 
-                            if first_operand[0]&0b10000000 != 0{
-                                first_operand[0] = first_operand[0]&0b01111111;
-                                first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
+                        if first_operand[0]&0b10000000 != 0{
+                            first_operand[0] = first_operand[0]&0b01111111;
+                            first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
+                        }
+                        else{
+                            first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
+                        }
+
+                        if second_operand[0]&0b10000000 != 0{
+                            second_operand[0] = second_operand[0]&0b01111111;
+                            second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
+                        }
+                        else{
+                            second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
+                        }
+
+                        let result = first_operand_big - second_operand_big;
+
+                        let (sign,mut resulting_bytes) = result.to_bytes_be();
+                        
+                        let res_bytes_length = resulting_bytes.len();
+                        
+                        for i in res_bytes_length..min_amount_of_bytes as usize{
+                            resulting_bytes.push(0);
+                        }
+
+                        if res_bytes_length < min_amount_of_bytes as usize{
+                            for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
+                                resulting_bytes[second] = resulting_bytes[first];
                             }
-                            else{
-                                first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
-                            }
-
-                            if second_operand[0]&0b10000000 != 0{
-                                second_operand[0] = second_operand[0]&0b01111111;
-                                second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
-                            }
-                            else{
-                                second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
-                            }
-
-                            println!("First Operand BigInt: {}",first_operand_big);
-                            println!("Second Operand BigInt: {}",second_operand_big);
-
-                            let result = first_operand_big - second_operand_big;
-
-                            println!("Result BigInt: {}",result);
-
-                            let (sign,mut resulting_bytes) = result.to_bytes_be();
-
-                            println!("Sign: {:?}",sign);
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..min_amount_of_bytes as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < min_amount_of_bytes as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..min_amount_of_bytes as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if sign == Sign::Minus{
-                                resulting_bytes[0] = resulting_bytes[0]|0b10000000;
-                            }else{
-                                resulting_bytes[0] = resulting_bytes[0]&0b01111111;
-                            }
-                            println!("Resulting bytes: {:X?}",resulting_bytes);
-                            
-                            if res_bytes_length > min_amount_of_bytes as usize{
-                                for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length).rev(){
-                                    stack.push_front(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter().rev(){
-                                    stack.push_front(*byte);
-                                }
-                            }
-
-                        }else{
-                            let mut first_operand_big:BigInt;
-                            let mut second_operand_big:BigInt;
-
-                            if first_operand[0]&0b10000000 != 0{
-                                first_operand[0] = first_operand[0]&0b01111111;
-                                first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
-                            }
-                            else{
-                                first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
-                            }
-
-                            if second_operand[0]&0b10000000 != 0{
-                                second_operand[0] = second_operand[0]&0b01111111;
-                                second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
-                            }
-                            else{
-                                second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
-                            }
-
-                            let result = first_operand_big - second_operand_big;
-
-                            let (sign,mut resulting_bytes) = result.to_bytes_be();
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..min_amount_of_bytes as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < min_amount_of_bytes as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..min_amount_of_bytes as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if sign == Sign::Minus{
-                                resulting_bytes[0] = resulting_bytes[0]|0b10000000;
-                            }else{
-                                resulting_bytes[0] = resulting_bytes[0]&0b01111111;
-                            }
-                            
-                            if res_bytes_length > min_amount_of_bytes as usize{
-                                for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length).rev(){
-                                    stack.push_front(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter().rev(){
-                                    stack.push_front(*byte);
-                                }
+                            for i in 0..min_amount_of_bytes as usize-res_bytes_length{
+                                resulting_bytes[i] = 0;
                             }
                         }
+
+                        if sign == Sign::Minus{
+                            resulting_bytes[0] = resulting_bytes[0]|0b10000000;
+                        }else{
+                            resulting_bytes[0] = resulting_bytes[0]&0b01111111;
+                        }
+                        
+                        if res_bytes_length > min_amount_of_bytes as usize{
+                            for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length).rev(){
+                                stack.push_front(resulting_bytes[i]);
+                            }
+                        }else{
+                            for byte in resulting_bytes.iter().rev(){
+                                stack.push_front(*byte);
+                            }
+                        }
+                        
                     }
                     5 => {
                         // int subtraction back
@@ -542,128 +417,60 @@ impl VM{
                         }
                         shift_4_bits_left_stricted(&mut second_operand);
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second operand: {:X?}",second_operand);
-                            let mut first_operand_big:BigInt;
-                            let mut second_operand_big:BigInt;
+                        let mut first_operand_big:BigInt;
+                        let mut second_operand_big:BigInt;
 
-                            if first_operand[0]&0b10000000 != 0{
-                                first_operand[0] = first_operand[0]&0b01111111;
-                                first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
+                        if first_operand[0]&0b10000000 != 0{
+                            first_operand[0] = first_operand[0]&0b01111111;
+                            first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
+                        }
+                        else{
+                            first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
+                        }
+
+                        if second_operand[0]&0b10000000 != 0{
+                            second_operand[0] = second_operand[0]&0b01111111;
+                            second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
+                        }
+                        else{
+                            second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
+                        }
+
+                        let result = first_operand_big - second_operand_big;
+
+                        let (sign,mut resulting_bytes) = result.to_bytes_be();
+
+                        let res_bytes_length = resulting_bytes.len();
+                        
+                        for i in res_bytes_length..min_amount_of_bytes as usize{
+                            resulting_bytes.push(0);
+                        }
+
+                        if res_bytes_length < min_amount_of_bytes as usize{
+                            for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
+                                resulting_bytes[second] = resulting_bytes[first];
                             }
-                            else{
-                                first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
-                            }
-
-                            if second_operand[0]&0b10000000 != 0{
-                                second_operand[0] = second_operand[0]&0b01111111;
-                                second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
-                            }
-                            else{
-                                second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
-                            }
-
-                            println!("First Operand BigInt: {}",first_operand_big);
-                            println!("Second Operand BigInt: {}",second_operand_big);
-
-                            let result = first_operand_big - second_operand_big;
-
-                            println!("Result BigInt: {}",result);
-
-                            let (sign,mut resulting_bytes) = result.to_bytes_be();
-
-                            println!("Sign: {:?}",sign);
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..min_amount_of_bytes as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < min_amount_of_bytes as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..min_amount_of_bytes as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if sign == Sign::Minus{
-                                resulting_bytes[0] = resulting_bytes[0]|0b10000000;
-                            }else{
-                                resulting_bytes[0] = resulting_bytes[0]&0b01111111;
-                            }
-                            println!("Resulting bytes: {:X?}",resulting_bytes);
-                            
-                            if res_bytes_length > min_amount_of_bytes as usize{
-                                for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length){
-                                    stack.push_back(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter(){
-                                    stack.push_back(*byte);
-                                }
-                            }
-
-                        }else{
-                            let mut first_operand_big:BigInt;
-                            let mut second_operand_big:BigInt;
-
-                            if first_operand[0]&0b10000000 != 0{
-                                first_operand[0] = first_operand[0]&0b01111111;
-                                first_operand_big = BigInt::from_bytes_be(Sign::Minus, &first_operand[..]);
-                            }
-                            else{
-                                first_operand_big = BigInt::from_bytes_be(Sign::Plus, &first_operand[..]);
-                            }
-
-                            if second_operand[0]&0b10000000 != 0{
-                                second_operand[0] = second_operand[0]&0b01111111;
-                                second_operand_big = BigInt::from_bytes_be(Sign::Minus, &second_operand[..]);
-                            }
-                            else{
-                                second_operand_big = BigInt::from_bytes_be(Sign::Plus, &second_operand[..]);
-                            }
-
-                            let result = first_operand_big - second_operand_big;
-
-                            let (sign,mut resulting_bytes) = result.to_bytes_be();
-
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..min_amount_of_bytes as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < min_amount_of_bytes as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((min_amount_of_bytes as usize-res_bytes_length..min_amount_of_bytes as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..min_amount_of_bytes as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if sign == Sign::Minus{
-                                resulting_bytes[0] = resulting_bytes[0]|0b10000000;
-                            }else{
-                                resulting_bytes[0] = resulting_bytes[0]&0b01111111;
-                            }
-
-                            if res_bytes_length > min_amount_of_bytes as usize{
-                                for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length){
-                                    stack.push_back(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter(){
-                                    stack.push_back(*byte);
-                                }
+                            for i in 0..min_amount_of_bytes as usize-res_bytes_length{
+                                resulting_bytes[i] = 0;
                             }
                         }
+
+                        if sign == Sign::Minus{
+                            resulting_bytes[0] = resulting_bytes[0]|0b10000000;
+                        }else{
+                            resulting_bytes[0] = resulting_bytes[0]&0b01111111;
+                        }
+
+                        if res_bytes_length > min_amount_of_bytes as usize{
+                            for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length){
+                                stack.push_back(resulting_bytes[i]);
+                            }
+                        }else{
+                            for byte in resulting_bytes.iter(){
+                                stack.push_back(*byte);
+                            }
+                        }
+                        
                     }
                     6 => {
                         // int multiplication front
@@ -683,84 +490,38 @@ impl VM{
                             second_operand.push(stack.pop_front().unwrap());
                         }
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second operand: {:X?}",second_operand);
+                        let mut first_operand_big = BigUint::from_bytes_be(&first_operand[..]);
+                        let mut second_operand_big = BigUint::from_bytes_be(&second_operand[..]);
 
-                            let mut first_operand_big = BigUint::from_bytes_be(&first_operand[..]);
-                            let mut second_operand_big = BigUint::from_bytes_be(&second_operand[..]);
+                        let result = first_operand_big * second_operand_big;
 
-                            println!("First Operand BigInt: {}",first_operand_big);
-                            println!("Second Operand BigInt: {}",second_operand_big);
+                        let mut resulting_bytes = result.to_bytes_be();
+                        
+                        let res_bytes_length = resulting_bytes.len();
+                        
+                        for i in res_bytes_length..N as usize{
+                            resulting_bytes.push(0);
+                        }
 
-                            let result = first_operand_big * second_operand_big;
-
-                            println!("Result BigInt: {}",result);
-
-                            let mut resulting_bytes = result.to_bytes_be();
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..N as usize{
-                                resulting_bytes.push(0);
+                        if res_bytes_length < N as usize{
+                            for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
+                                resulting_bytes[second] = resulting_bytes[first];
                             }
-
-                            if res_bytes_length < N as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..N as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            println!("Resulting bytes: {:X?}",resulting_bytes);
-
-                            if res_bytes_length > N as usize{
-                                for i in (res_bytes_length-N as usize..res_bytes_length).rev(){
-                                    stack.push_front(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter().rev(){
-                                    stack.push_front(*byte);
-                                }
-                            }
-
-                        }else{
-                            let mut first_operand_big = BigUint::from_bytes_be(&first_operand[..]);
-                            let mut second_operand_big = BigUint::from_bytes_be(&second_operand[..]);
-
-                            let result = first_operand_big * second_operand_big;
-
-                            let mut resulting_bytes = result.to_bytes_be();
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..N as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < N as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..N as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if res_bytes_length > N as usize{
-                                for i in (res_bytes_length-N as usize..res_bytes_length).rev(){
-                                    stack.push_front(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter().rev(){
-                                    stack.push_front(*byte);
-                                }
+                            for i in 0..N as usize-res_bytes_length{
+                                resulting_bytes[i] = 0;
                             }
                         }
+
+                        if res_bytes_length > N as usize{
+                            for i in (res_bytes_length-N as usize..res_bytes_length).rev(){
+                                stack.push_front(resulting_bytes[i]);
+                            }
+                        }else{
+                            for byte in resulting_bytes.iter().rev(){
+                                stack.push_front(*byte);
+                            }
+                        }
+                        
                     }
                     7 => {
                         // int multiplication back
@@ -779,84 +540,38 @@ impl VM{
                             second_operand.push(stack.pop_back().unwrap());
                         }
 
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Instruction index: {}",instruction_index);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second operand: {:X?}",second_operand);
+                        let mut first_operand_big = BigUint::from_bytes_le(&first_operand[..]);
+                        let mut second_operand_big = BigUint::from_bytes_le(&second_operand[..]);
 
-                            let mut first_operand_big = BigUint::from_bytes_le(&first_operand[..]);
-                            let mut second_operand_big = BigUint::from_bytes_le(&second_operand[..]);
+                        let result = first_operand_big * second_operand_big;
 
-                            println!("First Operand BigInt: {}",first_operand_big);
-                            println!("Second Operand BigInt: {}",second_operand_big);
+                        let mut resulting_bytes = result.to_bytes_be();
+                        
+                        let res_bytes_length = resulting_bytes.len();
+                        
+                        for i in res_bytes_length..N as usize{
+                            resulting_bytes.push(0);
+                        }
 
-                            let result = first_operand_big * second_operand_big;
-
-                            println!("Result BigInt: {}",result);
-
-                            let mut resulting_bytes = result.to_bytes_be();
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..N as usize{
-                                resulting_bytes.push(0);
+                        if res_bytes_length < N as usize{
+                            for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
+                                resulting_bytes[second] = resulting_bytes[first];
                             }
-
-                            if res_bytes_length < N as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..N as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            println!("Resulting bytes: {:X?}",resulting_bytes);
-
-                            if res_bytes_length > N as usize{
-                                for i in res_bytes_length-N as usize..res_bytes_length{
-                                    stack.push_back(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter(){
-                                    stack.push_back(*byte);
-                                }
-                            }
-
-                        }else{
-                            let mut first_operand_big = BigUint::from_bytes_le(&first_operand[..]);
-                            let mut second_operand_big = BigUint::from_bytes_le(&second_operand[..]);
-
-                            let result = first_operand_big * second_operand_big;
-
-                            let mut resulting_bytes = result.to_bytes_be();
-                            
-                            let res_bytes_length = resulting_bytes.len();
-                            
-                            for i in res_bytes_length..N as usize{
-                                resulting_bytes.push(0);
-                            }
-
-                            if res_bytes_length < N as usize{
-                                for (first,second) in (0..res_bytes_length).rev().zip((N as usize-res_bytes_length..N as usize).rev()){
-                                    resulting_bytes[second] = resulting_bytes[first];
-                                }
-                                for i in 0..N as usize-res_bytes_length{
-                                    resulting_bytes[i] = 0;
-                                }
-                            }
-
-                            if res_bytes_length > N as usize{
-                                for i in res_bytes_length-N as usize..res_bytes_length{
-                                    stack.push_back(resulting_bytes[i]);
-                                }
-                            }else{
-                                for byte in resulting_bytes.iter(){
-                                    stack.push_back(*byte);
-                                }
+                            for i in 0..N as usize-res_bytes_length{
+                                resulting_bytes[i] = 0;
                             }
                         }
+
+                        if res_bytes_length > N as usize{
+                            for i in res_bytes_length-N as usize..res_bytes_length{
+                                stack.push_back(resulting_bytes[i]);
+                            }
+                        }else{
+                            for byte in resulting_bytes.iter(){
+                                stack.push_back(*byte);
+                            }
+                        }
+                        
                     }
                     8|10|12|14 => {
                         // float operations front
@@ -880,37 +595,18 @@ impl VM{
                             _ => {result=0.0}
                         }
                         
-                        if in_debugging{
-                            println!("First Operand: {}",first_operand);
-                            println!("Second Operand: {}",second_operand);
-                            println!("Result: {:?}",result);
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                println!("Overflow encountered");
-                                print!("Adding bytes to stack: ");
-                                for i in (instruction_index..instruction_index+4).rev(){
-                                    stack.push_front(buffer[i]);
-                                    print!("{:X}",buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter(){
-                                    stack.push_front(*byte);
-                                }
-                            }
+                        if !result.is_finite() || result == 0.0{
+                            //overflow
+                            for i in (instruction_index..instruction_index+4).rev(){
+                                stack.push_front(buffer[i]);
+                            }  
                         }else{
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                for i in (instruction_index..instruction_index+4).rev(){
-                                    stack.push_front(buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter(){
-                                    stack.push_front(*byte);
-                                }
+                            static_array = unsafe{transmute(result)};
+                            for byte in static_array.iter(){
+                                stack.push_front(*byte);
                             }
                         }
+                        
                         instruction_index += 4;
                     }
                     9|11|13|15 => {
@@ -936,37 +632,18 @@ impl VM{
                             _ => {result=0.0}
                         }
                         
-                        if in_debugging{
-                            println!("First Operand: {}",first_operand);
-                            println!("Second Operand: {}",second_operand);
-                            println!("Result: {:?}",result);
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                println!("Overflow encountered");
-                                print!("Adding bytes to stack: ");
-                                for i in instruction_index..instruction_index+4{
-                                    stack.push_back(buffer[i]);
-                                    print!("{:X}",buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter().rev(){
-                                    stack.push_back(*byte);
-                                }
-                            }
+                        if !result.is_finite() || result == 0.0{
+                            //overflow
+                            for i in instruction_index..instruction_index+4{
+                                stack.push_back(buffer[i]);
+                            }  
                         }else{
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                for i in instruction_index..instruction_index+4{
-                                    stack.push_back(buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter().rev(){
-                                    stack.push_back(*byte);
-                                }
+                            static_array = unsafe{transmute(result)};
+                            for byte in static_array.iter().rev(){
+                                stack.push_back(*byte);
                             }
                         }
+                        
                         instruction_index += 4;
                     }
                     16|18|20|22 => {
@@ -991,37 +668,18 @@ impl VM{
                             _ => {result=0.0}
                         }
                         
-                        if in_debugging{
-                            println!("First Operand: {}",first_operand);
-                            println!("Second Operand: {}",second_operand);
-                            println!("Result: {:?}",result);
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                println!("Overflow encountered");
-                                print!("Adding bytes to stack: ");
-                                for i in (instruction_index..instruction_index+8).rev(){
-                                    stack.push_front(buffer[i]);
-                                    print!("{:X}",buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter(){
-                                    stack.push_front(*byte);
-                                }
-                            }
+                        if !result.is_finite() || result == 0.0{
+                            //overflow
+                            for i in (instruction_index..instruction_index+8).rev(){
+                                stack.push_front(buffer[i]);
+                            }  
                         }else{
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                for i in (instruction_index..instruction_index+8).rev(){
-                                    stack.push_front(buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter(){
-                                    stack.push_front(*byte);
-                                }
+                            static_array = unsafe{transmute(result)};
+                            for byte in static_array.iter(){
+                                stack.push_front(*byte);
                             }
                         }
+                        
                         instruction_index += 8;
                     }
                     17|19|21|23 => {
@@ -1047,37 +705,18 @@ impl VM{
                             _ => {result=0.0}
                         }
                         
-                        if in_debugging{
-                            println!("First Operand: {}",first_operand);
-                            println!("Second Operand: {}",second_operand);
-                            println!("Result: {:?}",result);
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                println!("Overflow encountered");
-                                print!("Adding bytes to stack: ");
-                                for i in instruction_index..instruction_index+8{
-                                    stack.push_back(buffer[i]);
-                                    print!("{:X}",buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter().rev(){
-                                    stack.push_back(*byte);
-                                }
-                            }
+                        if !result.is_finite() || result == 0.0{
+                            //overflow
+                            for i in instruction_index..instruction_index+8{
+                                stack.push_back(buffer[i]);
+                            }  
                         }else{
-                            if !result.is_finite() || result == 0.0{
-                                //overflow
-                                for i in instruction_index..instruction_index+8{
-                                    stack.push_back(buffer[i]);
-                                }  
-                            }else{
-                                static_array = unsafe{transmute(result)};
-                                for byte in static_array.iter().rev(){
-                                    stack.push_back(*byte);
-                                }
+                            static_array = unsafe{transmute(result)};
+                            for byte in static_array.iter().rev(){
+                                stack.push_back(*byte);
                             }
                         }
+                        
                         instruction_index += 8;
                     }
                     24|26|28 => {
@@ -1095,34 +734,16 @@ impl VM{
                         for i in 0..N{
                             second_operand.push(stack.pop_front().unwrap());
                         }
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second Operand: {:X?}",second_operand);
-                            print!("Result: ");
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_opcode{
-                                    24 =>{stack.push_front(*first|*second);
-                                            print!("{}",*first|*second);}
-                                    26 =>{stack.push_front(*first&*second);
-                                            print!("{}",*first&*second);}
-                                    28 =>{stack.push_front(*first^*second);
-                                            print!("{}",*first^*second);}
-                                    _=>{}
-                                }
-                            }
-                            print!("\n");
-                        }
-                        else{
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_opcode{
-                                    24 =>{stack.push_front(*first|*second)}
-                                    26 =>{stack.push_front(*first&*second)}
-                                    28 =>{stack.push_front(*first^*second)}
-                                    _=>{}
-                                }
+
+                        for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
+                            match instruction_opcode{
+                                24 =>{stack.push_front(*first|*second)}
+                                26 =>{stack.push_front(*first&*second)}
+                                28 =>{stack.push_front(*first^*second)}
+                                _=>{}
                             }
                         }
+                        
                     }
                     25|27|29 => {
                         let mut N:u16 = stack.pop_back().unwrap() as u16+((stack.pop_back().unwrap() as u16)<<8);
@@ -1138,34 +759,16 @@ impl VM{
                         for i in 0..N{
                             second_operand.push(stack.pop_back().unwrap());
                         }
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("First Operand: {:X?}",first_operand);
-                            println!("Second Operand: {:X?}",second_operand);
-                            print!("Result: ");
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_opcode{
-                                    25 =>{stack.push_back(*first|*second);
-                                            print!("{}",*first|*second);}
-                                    27 =>{stack.push_back(*first&*second);
-                                            print!("{}",*first&*second);}
-                                    29 =>{stack.push_back(*first^*second);
-                                            print!("{}",*first^*second);}
-                                    _=>{}
-                                }
-                            }
-                            print!("\n");
-                        }
-                        else{
-                            for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
-                                match instruction_opcode{
-                                    25 =>{stack.push_back(*first|*second)}
-                                    27 =>{stack.push_back(*first&*second)}
-                                    29 =>{stack.push_back(*first^*second)}
-                                    _=>{}
-                                }
+                        
+                        for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
+                            match instruction_opcode{
+                                25 =>{stack.push_back(*first|*second)}
+                                27 =>{stack.push_back(*first&*second)}
+                                29 =>{stack.push_back(*first^*second)}
+                                _=>{}
                             }
                         }
+                        
                     }
                     30 => {
                         //pop front biwise not
@@ -1178,21 +781,10 @@ impl VM{
                             operand.push(stack.pop_front().unwrap());
                         }
                         
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Operand: {:X?}",operand);
-                            print!("Result: ");
-                            for byte in operand.iter().rev(){
-                                stack.push_front(!*byte);
-                                print!("{}",!*byte);
-                            }
-                            print!("\n");
+                        for byte in operand.iter().rev(){
+                            stack.push_front(!*byte);
                         }
-                        else{
-                            for byte in operand.iter().rev(){
-                                stack.push_front(!*byte);
-                            }
-                        }
+                    
                     }
                     31 => {
                         //pop back bitwise not
@@ -1205,21 +797,10 @@ impl VM{
                             operand.push(stack.pop_back().unwrap());
                         }
                         
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("Operand: {:X?}",operand);
-                            print!("Result: ");
-                            for byte in operand.iter().rev(){
-                                stack.push_back(!*byte);
-                                print!("{}",!*byte);
-                            }
-                            print!("\n");
+                        for byte in operand.iter().rev(){
+                            stack.push_back(!*byte);
                         }
-                        else{
-                            for byte in operand.iter().rev(){
-                                stack.push_back(!*byte);
-                            }
-                        }
+                    
                     }
                     32 => {
                         // pop front shift left
@@ -1249,11 +830,7 @@ impl VM{
                             num = num<<S as usize;
                             operand = num.to_bytes_le();
                         }
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("S: {}",S);
-                            println!("result: {:X?}",operand);
-                        }
+                        
                         for byte in operand.iter(){
                             stack.push_front(*byte);
                         }
@@ -1274,11 +851,7 @@ impl VM{
                         let mut num = BigUint::from_bytes_le(&operand);
                         num = num<<S as usize;
                         operand = num.to_bytes_be();
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("S: {}",S);
-                            println!("result: {:X?}",operand);
-                        }
+
                         for byte in operand.iter(){
                             stack.push_back(*byte);
                         }
@@ -1299,11 +872,7 @@ impl VM{
                         let mut num = BigUint::from_bytes_be(&operand);
                         num = num>>S as usize;
                         operand = num.to_bytes_le();
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("S: {}",S);
-                            println!("result: {:X?}",operand);
-                        }
+                        
                         for byte in operand.iter(){
                             stack.push_front(*byte);
                         }
@@ -1325,11 +894,7 @@ impl VM{
                         let mut num = BigUint::from_bytes_le(&operand);
                         num = num >> S as usize;
                         operand = num.to_bytes_be();
-                        if in_debugging{
-                            println!("N: {}",N);
-                            println!("S: {}",S);
-                            println!("result: {:X?}",operand);
-                        }
+                        
                         for byte in operand.iter(){
                             stack.push_back(*byte);
                         }
@@ -1365,12 +930,7 @@ impl VM{
                         second_operand |= stack[address as usize] as u32;
 
                         let result:u32 = first_operand+second_operand;
-                        if in_debugging{
-                            println!("address: {}",address);
-                            println!("first operand: {}",first_operand);
-                            println!("second operand: {}",second_operand);
-                            println!("result: {:X?}",result);
-                        }
+                        
                         stack.push_front((result&0x000000ff) as u8);
                         stack.push_front((result&0x0000ff00) as u8);
                         stack.push_front((result&0x00ff0000) as u8);
@@ -1408,12 +968,7 @@ impl VM{
                         second_operand |= stack[address as usize] as u32;
 
                         let result:u32 = first_operand+second_operand;
-                        if in_debugging{
-                            println!("address: {}",address);
-                            println!("first operand: {}",first_operand);
-                            println!("second operand: {}",second_operand);
-                            println!("result: {:X?}",result);
-                        }
+                        
                         stack.push_back((result&0xff000000) as u8);
                         stack.push_back((result&0x00ff0000) as u8);
                         stack.push_back((result&0x0000ff00) as u8);
@@ -1450,12 +1005,7 @@ impl VM{
                         second_operand |= stack[address as usize] as u32;
 
                         let result:u32 = unsafe{transmute(first_operand as i32 - second_operand as i32)};
-                        if in_debugging{
-                            println!("address: {}",address);
-                            println!("first operand: {}",first_operand);
-                            println!("second operand: {}",second_operand);
-                            println!("result: {:X?}",result);
-                        }
+                        
                         stack.push_front((result&0x000000ff) as u8);
                         stack.push_front((result&0x0000ff00) as u8);
                         stack.push_front((result&0x00ff0000) as u8);
@@ -1492,12 +1042,7 @@ impl VM{
                         second_operand |= stack[address as usize] as u32;
 
                         let result:u32 = unsafe{transmute(first_operand as i32 - second_operand as i32)};
-                        if in_debugging{
-                            println!("address: {}",address);
-                            println!("first operand: {}",first_operand);
-                            println!("second operand: {}",second_operand);
-                            println!("result: {:X?}",result);
-                        }
+                        
                         stack.push_back((result&0xff000000) as u8);
                         stack.push_back((result&0x00ff0000) as u8);
                         stack.push_back((result&0x0000ff00) as u8);
@@ -1673,9 +1218,6 @@ impl VM{
                                     instruction_counter);
                         return Err("Unknown instruction");
                     }
-                }
-                if in_debugging{
-                    pause();
                 }
             }
         }
