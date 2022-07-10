@@ -8,7 +8,6 @@ Algorithm uses custom VM
 VM's instrution opcode is 2 byte long, instructions have different sizes
 
 # VM instruction set
-# Now it generates random opcodes for instructions
 
 Number | Arguments | Description 
 -------|-----------|------------
@@ -81,7 +80,7 @@ Number | Arguments | Description
 
 # Algorithm Execution
 
-Algorithm executes, while length of stack is greater, than specified maximum output size.
+Algorithm executes, in blocks. Whole algorithm is ran on every block, after block is calculated it's pushed back to stack. So blocks cannot be predetermined and separated initially, algorithm has to be executed block by block.
 
 After execution is finished, VM pops 32 bit integers(big-endian) from front of the stack and pushes them to the final state. If there left 1/2/3 bytes in stack, they are converted to 32 bit integer and pushed to the final state.
 
