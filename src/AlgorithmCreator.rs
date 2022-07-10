@@ -27,6 +27,8 @@ macro_rules! push_u_to_u8_vec{
 const AMOUNT_OF_EXE_INSTRUCTIONS:usize = 49;
 const AMOUNT_OF_INSTRUCTIONS:usize = 49;
 static MAX_INSTRUCTION_SIZE:u64 = 65536;
+static MAX_POP_SIZE_BITWISE:usize = 16;
+static MAX_SHIFT_LIMIT:usize = 16;
 
 pub fn generate_lookup_table<'a>(seed:&mut [u8]) -> [u16;AMOUNT_OF_INSTRUCTIONS]{
     let mut to_return:[u16;AMOUNT_OF_INSTRUCTIONS] = [0;AMOUNT_OF_INSTRUCTIONS];
@@ -51,69 +53,43 @@ pub fn generate_lookup_table<'a>(seed:&mut [u8]) -> [u16;AMOUNT_OF_INSTRUCTIONS]
     return to_return;
 }
 
-
 pub fn create_algorithm(seed:&mut [u8],
-                        min_inp_batch:u64,
-                        result_size:u64,
-                        minimal_instructions:u64
+                        mut block_size:usize,
+                        min_block_size:usize,
+                        max_instructions:usize,
+                        statics_amount:usize,
+                        statics_max_size:usize
                     ) -> Result<Vec<u8>,&'static str>{
 
     let mut rng = RNG::MD5RNG::get_generator(seed);
-
-    let input_batch_size:u64 = min_inp_batch+
-        Tools::biguint_into_u64(rng.generate()%1000usize);
-
-    let size_koef:u32 = 100;
-    let static_values_max_size:u32 = 20;
-
-    let bitwise_right_shift_limit:u8 = 8;
-
-    let bitwise_left_shift_limit:u8 = 8;
-    let bitwise_max_size:u8 = 32;
-
-    let max_static_values = 1;
-    //let minimal_instructions:u64 = input_batch_size/200;
-    println!("Minimal instructions: {}",minimal_instructions);
-
-    //let mut bytes: [u8; 8];
-    let mut algorithm: Vec<u8> = Vec::with_capacity(min_inp_batch as usize);
-    //bytes = unsafe { transmute(input_batch_size) };
-
-    push_u_to_u8_vec!(algorithm,input_batch_size);
-
-    let mut current_stack_size:u64 = input_batch_size;
     
-    let mut static_values_counter:u64 = 0;
+    let mut algorithm: Vec<u8> = Vec::with_capacity(max_instructions);
 
-    let mut instruction:u8 = 0;
+    let mut instructions:usize = 0;
+    let mut static_counter:usize = 0;
 
-    let mut instruction_number:u64 = 0;
+    //&& block_size >= min_block_size
+    while instructions < max_instructions
+            {
 
-    let mut N:u64 = 0;
-    while instruction_number < minimal_instructions 
-            && current_stack_size>result_size{
-                
-        instruction = Tools::biguint_into_u8(rng.generate()%AMOUNT_OF_EXE_INSTRUCTIONS);
-        
-        let instruction_opcode:u8 = instruction;
-
+        let instruction = Tools::biguint_into_u8(rng.generate()%AMOUNT_OF_EXE_INSTRUCTIONS);
+    
         match instruction{
-            0|1 => {
-                if static_values_counter == max_static_values{
+            0|1 =>{
+                if static_counter >= statics_amount{
                     continue;
                 }
-                static_values_counter += 1;
+                static_counter += 1;
 
-                algorithm.push(instruction_opcode);
-                
-                let mut N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%static_values_max_size);
-                //println!("N: {}",N);
-                current_stack_size += N as u64;
+                algorithm.push(instruction);
+
+                let mut N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%statics_max_size);
+            
+                block_size += N as usize;
+
                 let converted_num:[u8;2] = unsafe{transmute(N)};
-                //println!("converted: {:X?}",converted_num);
                 algorithm.push(converted_num[1]);
                 algorithm.push(converted_num[0]);
-                //println!("alg: {:X?}",algorithm);
 
                 while N >= 8{
                     let num:u64 = Tools::biguint_into_u64(rng.generate());
@@ -135,13 +111,11 @@ pub fn create_algorithm(seed:&mut [u8],
                     algorithm.push(num);
                     N -= 1;
                 }
-
             }
             2|3|4|5 => {
-                algorithm.push(instruction_opcode);
-                //algorithm.push(instruction);
+                algorithm.push(instruction);
 
-                let amount_of_bytes:u16 = 1 + Tools::biguint_into_u16(rng.generate()%size_koef);
+                let amount_of_bytes:u16 = 1 + Tools::biguint_into_u16(rng.generate()%100u32);
                 let N:u16 = amount_of_bytes*4;
 
                 push_u16_to_u8_vec!(algorithm,N);
@@ -151,85 +125,88 @@ pub fn create_algorithm(seed:&mut [u8],
                         || min_amount_of_bytes%8 != 0{
                     min_amount_of_bytes += 1;
                 }
-                current_stack_size -= min_amount_of_bytes as u64;
+                block_size -= min_amount_of_bytes as usize;
             }
             6|7 => {
-                algorithm.push(instruction_opcode);
-                let N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%size_koef);
+                algorithm.push(instruction);
+                let N:u16 = 1 + Tools::biguint_into_u16(rng.generate()%100u32);
                 
                 algorithm.push(((N&0xff00)>>8) as u8);
                 algorithm.push((N&0xff) as u8);
 
-                current_stack_size -= N as u64;
+                block_size -= N as usize;
             }
             8|9|10|11|12|13|14|15 => {
-                algorithm.push(instruction_opcode);
+                algorithm.push(instruction);
                 let overflow_bytes:u32 = Tools::biguint_into_u32(rng.generate());
                 push_u_to_u8_vec!(algorithm,overflow_bytes);
 
-                current_stack_size -= 4;
+                block_size -= 4;
             }
             16|17|18|19|20|21|22|23 => {
-                algorithm.push(instruction_opcode);
+                algorithm.push(instruction);
                 let overflow_bytes:u64 = Tools::biguint_into_u64(rng.generate());
                 push_u_to_u8_vec!(algorithm,overflow_bytes);
 
-                current_stack_size -= 8;
+                block_size -= 8;
             }
             24|25|26|27|28|29 => {
-                algorithm.push(instruction_opcode);
-                current_stack_size -= bitwise_max_size as u64 + 2;
+                algorithm.push(instruction);
+                block_size -= MAX_POP_SIZE_BITWISE;
             }
             30|31 => {
-                algorithm.push(instruction_opcode);
-                current_stack_size -= 2;
+                algorithm.push(instruction);
+                block_size -= 2;
             }
             32|33 => {
-                algorithm.push(instruction_opcode);
-                let mut S:u8 = Tools::biguint_into_u8(rng.generate())%bitwise_left_shift_limit as u8;
+                algorithm.push(instruction);
+                let mut S:u8 = Tools::biguint_into_u8(rng.generate())%MAX_SHIFT_LIMIT as u8;
 
                 algorithm.push(S);
 
                 while S >= 8{
-                    current_stack_size += 1;
+                    block_size += 1;
                     S -= 8;
                 }
             }
             34|35 => {
-                algorithm.push(instruction_opcode);
-                let mut S:u8 = Tools::biguint_into_u8(rng.generate())%bitwise_right_shift_limit;
+                algorithm.push(instruction);
+                let mut S:u8 = Tools::biguint_into_u8(rng.generate())%MAX_SHIFT_LIMIT as u8;
                 algorithm.push(S);
                 while S >=8 {
-                    current_stack_size -= 1;
+                    block_size -= 1;
                     S -= 8;
                 }
             }
             36|37|38|39 => {
-                algorithm.push(instruction_opcode);
-                current_stack_size -= 4;
+                algorithm.push(instruction);
+                block_size -= 4;
             }
             40|41 =>{
-                algorithm.push(instruction_opcode);
-                current_stack_size -= 16;
+                algorithm.push(instruction);
+                block_size -= 16;
             }
             42|43 =>{
-                algorithm.push(instruction_opcode);
-                current_stack_size -= 24;
+                algorithm.push(instruction);
+                block_size -= 24;
             }
             44|45 =>{
-                algorithm.push(instruction_opcode);
-                current_stack_size -= 32;
+                algorithm.push(instruction);
+                block_size -= 32;
             }
             46 =>{
-                algorithm.push(instruction_opcode);
+                algorithm.push(instruction);
             }
             _ => {continue;}
         }
-        instruction_number += 1;
-    }   
-    println!("Instruction number: {}",instruction_number);
+
+        instructions += 1;
+    }
+
     algorithm.push(46);
     algorithm.push(47);
-    // algorithm.push(lookup_table[40]);
+
+    println!("Instructions count: {:?}",instructions);
+
     return Ok(algorithm);
 }

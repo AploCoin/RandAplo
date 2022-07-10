@@ -67,7 +67,11 @@ Number | Arguments | Description
 |||
 40||AES128 encrypt, pop key(128 bites) from front and block(128 bites) from back, encrypt, push result to front
 41||AES128 decrypt, same with 40, but decryption
-42-46||AES192, AES256
+42-45||AES192, AES256
+|||
+||**MISC**|
+|||
+46||Pop 4 bytes from back push to front
 |||
 ||**Digest operations**|
 |||

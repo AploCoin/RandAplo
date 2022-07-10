@@ -40,22 +40,20 @@ fn shift_4_bits_left_stricted(input_vector:&mut Vec<u8>){
     }
 }
 
-pub fn pad_data(data:&mut VecDeque<u8>,size:u64){
+pub fn pad_data(data:&mut Vec<u8>,size:u64){
     let mut initial_size:u64 = data.len() as u64;
     let mut data_vector:Vec<u8> = Vec::with_capacity(data.len());
     for byte in data.iter(){
         data_vector.push(*byte);
     }
     let mut rng = MurMur2RNG::get_generator(&mut data_vector, initial_size);
-    
-    //data.reserve(size as usize-data.capacity());
 
     let mut bytes:[u8;4];
 
     while initial_size <= size-4{
         bytes = unsafe{transmute(rng.generate())};
         for byte in bytes.iter().rev(){
-            data.push_back(*byte);
+            data.push(*byte);
         }
         initial_size += 4;
     }
@@ -63,27 +61,21 @@ pub fn pad_data(data:&mut VecDeque<u8>,size:u64){
     match size-initial_size{
         1 => {
             bytes = unsafe{transmute(rng.generate())};
-            data.push_back(bytes[0]);
+            data.push(bytes[0]);
         }
         2 => {
             bytes = unsafe{transmute(rng.generate())};
-            data.push_back(bytes[0]);
-            data.push_back(bytes[1]);
+            data.push(bytes[0]);
+            data.push(bytes[1]);
         }
         3 => {
             bytes = unsafe{transmute(rng.generate())};
-            data.push_back(bytes[0]);
-            data.push_back(bytes[1]);
-            data.push_back(bytes[2]);
+            data.push(bytes[0]);
+            data.push(bytes[1]);
+            data.push(bytes[2]);
         }
         _ => {}
     }
-    // let mut value_to_put:u8 = 0;
-    // while initial_size <= size{
-    //     data.push_back(value_to_put);
-    //     value_to_put += 1;
-    //     initial_size += 1;
-    // }
 
 }
 
@@ -92,30 +84,35 @@ static lookup_table:[u8;16] = [b'0',b'1',b'2',b'3',
                                  b'8',b'9',b'A',b'B',
                                  b'C',b'D',b'E',b'F'];
 
+static MAX_POP_SIZE_BITWISE:usize = 16;
+
 impl VM{
     pub fn execute_from_buffer(&mut self,
                         buffer:&[u8],
-                        stack:&mut VecDeque<u8>,
-                        output_max_size:usize,
-                        debug:bool,
-                        breakpoint:usize) -> Result<(),&'static str>{
+                        stack:&mut Vec<u8>,
+                        block_size:usize,
+                        min_block_size:usize,
+                        output_max_size:usize
+                    ) -> Result<(),&'static str>{
         // will change stack variable
-
         
-        let mut instruction_opcode:u8;
-        let bitwise_max_size:u16 = 15;
-
+        let mut block_start:usize = 0;
         while stack.len() > output_max_size{
             let mut instruction_index:usize = 0;
-            let mut instruction_counter:usize = 0;
-            //println!("Stack: {}",stack.len());
+            let mut block_end = block_start + block_size;
+            if block_end > stack.len(){
+                block_end = stack.len();
+            }
+            let mut block:VecDeque<u8> = VecDeque::from_iter(stack[block_start..block_end].iter().copied());
+            
+            let mut start_index = block_start;
+            let mut end_index = block_end;
+
             while instruction_index != buffer.len()
-                    && stack.len() > output_max_size{
+                    && block.len() > min_block_size{
 
-                instruction_opcode = buffer[instruction_index];
-
+                let instruction_opcode = buffer[instruction_index];
                 instruction_index += 1;
-                instruction_counter += 1;
 
                 match instruction_opcode{
                     0 => {
@@ -125,7 +122,7 @@ impl VM{
                         instruction_index += 2;
 
                         for i in 0..N{
-                            stack.push_back(buffer[instruction_index]);
+                            block.push_back(buffer[instruction_index]);
                             instruction_index += 1;
                         }
                     }
@@ -135,12 +132,12 @@ impl VM{
 
                         instruction_index += 2;
 
-                        if stack.capacity()-stack.len() < N as usize{
-                            stack.reserve(N as usize - stack.capacity());
+                        if block.capacity()-block.len() < N as usize{
+                            block.reserve(N as usize - block.capacity());
                         }
 
                         for i in 0..N as usize{
-                            stack.push_front(buffer[instruction_index+i]);
+                            block.push_front(buffer[instruction_index+i]);
                         }
                         instruction_index += N as usize;
 
@@ -161,7 +158,7 @@ impl VM{
                         let mut poped_bytes:Vec<u8> = Vec::with_capacity(bytes_to_pop as usize);
 
                         for i in 0..bytes_to_pop{
-                            poped_bytes.push(stack.pop_front().unwrap());
+                            poped_bytes.push(block.pop_front().unwrap());
                         }
                         
                         let mut first_operand:Vec<u8> = Vec::with_capacity(min_amount_of_bytes as usize);
@@ -199,7 +196,7 @@ impl VM{
                                             + *second as u16 
                                             + carry as u16;
                             carry = (result>>8) as u8;
-                            stack.push_front((result&0x00ff) as u8);
+                            block.push_front((result&0x00ff) as u8);
                         }
                         
 
@@ -220,7 +217,7 @@ impl VM{
                         let mut poped_bytes:Vec<u8> = Vec::with_capacity(bytes_to_pop as usize);
 
                         for i in 0..bytes_to_pop{
-                            poped_bytes.push(stack.pop_back().unwrap());
+                            poped_bytes.push(block.pop_back().unwrap());
                         }
                         poped_bytes.reverse();
                         
@@ -265,7 +262,7 @@ impl VM{
                         }
                         
                         for byte in resulting_bytes.iter().rev(){
-                            stack.push_back(*byte);
+                            block.push_back(*byte);
                         }
                         
                     }
@@ -285,7 +282,7 @@ impl VM{
                         let mut poped_bytes:Vec<u8> = Vec::with_capacity(bytes_to_pop as usize);
 
                         for i in 0..bytes_to_pop{
-                            poped_bytes.push(stack.pop_front().unwrap());
+                            poped_bytes.push(block.pop_front().unwrap());
                         }
                         
                         let mut first_operand:Vec<u8> = Vec::with_capacity(min_amount_of_bytes as usize);
@@ -361,11 +358,11 @@ impl VM{
                         
                         if res_bytes_length > min_amount_of_bytes as usize{
                             for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length).rev(){
-                                stack.push_front(resulting_bytes[i]);
+                                block.push_front(resulting_bytes[i]);
                             }
                         }else{
                             for byte in resulting_bytes.iter().rev(){
-                                stack.push_front(*byte);
+                                block.push_front(*byte);
                             }
                         }
                         
@@ -386,7 +383,7 @@ impl VM{
                         let mut poped_bytes:Vec<u8> = Vec::with_capacity(bytes_to_pop as usize);
 
                         for i in 0..bytes_to_pop{
-                            poped_bytes.push(stack.pop_back().unwrap());
+                            poped_bytes.push(block.pop_back().unwrap());
                         }
                         
                         poped_bytes.reverse();
@@ -463,11 +460,11 @@ impl VM{
 
                         if res_bytes_length > min_amount_of_bytes as usize{
                             for i in (res_bytes_length-min_amount_of_bytes as usize..res_bytes_length){
-                                stack.push_back(resulting_bytes[i]);
+                                block.push_back(resulting_bytes[i]);
                             }
                         }else{
                             for byte in resulting_bytes.iter(){
-                                stack.push_back(*byte);
+                                block.push_back(*byte);
                             }
                         }
                         
@@ -482,12 +479,12 @@ impl VM{
                         let mut second_operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            first_operand.push(stack.pop_front().unwrap());
+                            first_operand.push(block.pop_front().unwrap());
                         }
-                        // println!("len: {}",stack.len());
+                        // println!("len: {}",block.len());
                         // println!("N: {}",N);
                         for i in 0..N{
-                            second_operand.push(stack.pop_front().unwrap());
+                            second_operand.push(block.pop_front().unwrap());
                         }
 
                         let mut first_operand_big = BigUint::from_bytes_be(&first_operand[..]);
@@ -514,11 +511,11 @@ impl VM{
 
                         if res_bytes_length > N as usize{
                             for i in (res_bytes_length-N as usize..res_bytes_length).rev(){
-                                stack.push_front(resulting_bytes[i]);
+                                block.push_front(resulting_bytes[i]);
                             }
                         }else{
                             for byte in resulting_bytes.iter().rev(){
-                                stack.push_front(*byte);
+                                block.push_front(*byte);
                             }
                         }
                         
@@ -533,11 +530,11 @@ impl VM{
                         let mut second_operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            first_operand.push(stack.pop_back().unwrap());
+                            first_operand.push(block.pop_back().unwrap());
                         }     
 
                         for i in 0..N{
-                            second_operand.push(stack.pop_back().unwrap());
+                            second_operand.push(block.pop_back().unwrap());
                         }
 
                         let mut first_operand_big = BigUint::from_bytes_le(&first_operand[..]);
@@ -564,11 +561,11 @@ impl VM{
 
                         if res_bytes_length > N as usize{
                             for i in res_bytes_length-N as usize..res_bytes_length{
-                                stack.push_back(resulting_bytes[i]);
+                                block.push_back(resulting_bytes[i]);
                             }
                         }else{
                             for byte in resulting_bytes.iter(){
-                                stack.push_back(*byte);
+                                block.push_back(*byte);
                             }
                         }
                         
@@ -577,12 +574,12 @@ impl VM{
                         // float operations front
                         let mut static_array:[u8;4] = [0,0,0,0];
                         for i in 0..4{
-                            static_array[i] = stack.pop_front().unwrap();
+                            static_array[i] = block.pop_front().unwrap();
                         }
                         let first_operand:f32 = f32::from_be_bytes(static_array);
 
                         for i in 0..4{
-                            static_array[i] = stack.pop_front().unwrap();
+                            static_array[i] = block.pop_front().unwrap();
                         }
                         let second_operand:f32 = f32::from_be_bytes(static_array);
                         let mut result:f32;
@@ -598,12 +595,12 @@ impl VM{
                         if !result.is_finite() || result == 0.0{
                             //overflow
                             for i in (instruction_index..instruction_index+4).rev(){
-                                stack.push_front(buffer[i]);
+                                block.push_front(buffer[i]);
                             }  
                         }else{
                             static_array = unsafe{transmute(result)};
                             for byte in static_array.iter(){
-                                stack.push_front(*byte);
+                                block.push_front(*byte);
                             }
                         }
                         
@@ -613,12 +610,12 @@ impl VM{
                         // float operations back
                         let mut static_array:[u8;4] = [0,0,0,0];
                         for i in 0..4{
-                            static_array[i] = stack.pop_back().unwrap();
+                            static_array[i] = block.pop_back().unwrap();
                         }
                         let first_operand:f32 = f32::from_le_bytes(static_array);
 
                         for i in 0..4{
-                            static_array[i] = stack.pop_back().unwrap();
+                            static_array[i] = block.pop_back().unwrap();
                         }
                         let second_operand:f32 = f32::from_le_bytes(static_array);
 
@@ -635,12 +632,12 @@ impl VM{
                         if !result.is_finite() || result == 0.0{
                             //overflow
                             for i in instruction_index..instruction_index+4{
-                                stack.push_back(buffer[i]);
+                                block.push_back(buffer[i]);
                             }  
                         }else{
                             static_array = unsafe{transmute(result)};
                             for byte in static_array.iter().rev(){
-                                stack.push_back(*byte);
+                                block.push_back(*byte);
                             }
                         }
                         
@@ -650,12 +647,12 @@ impl VM{
                         // double operations front
                         let mut static_array:[u8;8] = [0,0,0,0,0,0,0,0];
                         for i in 0..8{
-                            static_array[i] = stack.pop_front().unwrap();
+                            static_array[i] = block.pop_front().unwrap();
                         }
                         let first_operand:f64 = f64::from_be_bytes(static_array);
 
                         for i in 0..8{
-                            static_array[i] = stack.pop_front().unwrap();
+                            static_array[i] = block.pop_front().unwrap();
                         }
                         let second_operand:f64 = f64::from_be_bytes(static_array);
                         let mut result:f64;
@@ -671,12 +668,12 @@ impl VM{
                         if !result.is_finite() || result == 0.0{
                             //overflow
                             for i in (instruction_index..instruction_index+8).rev(){
-                                stack.push_front(buffer[i]);
+                                block.push_front(buffer[i]);
                             }  
                         }else{
                             static_array = unsafe{transmute(result)};
                             for byte in static_array.iter(){
-                                stack.push_front(*byte);
+                                block.push_front(*byte);
                             }
                         }
                         
@@ -686,12 +683,12 @@ impl VM{
                         // double operations back
                         let mut static_array:[u8;8] = [0,0,0,0,0,0,0,0];
                         for i in 0..8{
-                            static_array[i] = stack.pop_back().unwrap();
+                            static_array[i] = block.pop_back().unwrap();
                         }
                         let first_operand:f64 = f64::from_le_bytes(static_array);
 
                         for i in 0..8{
-                            static_array[i] = stack.pop_back().unwrap();
+                            static_array[i] = block.pop_back().unwrap();
                         }
                         let second_operand:f64 = f64::from_le_bytes(static_array);
 
@@ -708,12 +705,12 @@ impl VM{
                         if !result.is_finite() || result == 0.0{
                             //overflow
                             for i in instruction_index..instruction_index+8{
-                                stack.push_back(buffer[i]);
+                                block.push_back(buffer[i]);
                             }  
                         }else{
                             static_array = unsafe{transmute(result)};
                             for byte in static_array.iter().rev(){
-                                stack.push_back(*byte);
+                                block.push_back(*byte);
                             }
                         }
                         
@@ -721,50 +718,50 @@ impl VM{
                     }
                     24|26|28 => {
                         // bitwise operations front
-                        let mut N:u16 = ((stack.pop_front().unwrap() as u16)<<8)+stack.pop_front().unwrap() as u16;
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = ((block.pop_front().unwrap() as u16)<<8)+block.pop_front().unwrap() as u16;
+                        N = N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut first_operand:Vec<u8> = Vec::with_capacity(N as usize);
                         let mut second_operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            first_operand.push(stack.pop_front().unwrap());
+                            first_operand.push(block.pop_front().unwrap());
                         }
                         
                         for i in 0..N{
-                            second_operand.push(stack.pop_front().unwrap());
+                            second_operand.push(block.pop_front().unwrap());
                         }
 
                         for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
                             match instruction_opcode{
-                                24 =>{stack.push_front(*first|*second)}
-                                26 =>{stack.push_front(*first&*second)}
-                                28 =>{stack.push_front(*first^*second)}
+                                24 =>{block.push_front(*first|*second)}
+                                26 =>{block.push_front(*first&*second)}
+                                28 =>{block.push_front(*first^*second)}
                                 _=>{}
                             }
                         }
                         
                     }
                     25|27|29 => {
-                        let mut N:u16 = stack.pop_back().unwrap() as u16+((stack.pop_back().unwrap() as u16)<<8);
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = block.pop_back().unwrap() as u16+((block.pop_back().unwrap() as u16)<<8);
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut first_operand:Vec<u8> = Vec::with_capacity(N as usize);
                         let mut second_operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            first_operand.push(stack.pop_back().unwrap());
+                            first_operand.push(block.pop_back().unwrap());
                         }
                         
                         for i in 0..N{
-                            second_operand.push(stack.pop_back().unwrap());
+                            second_operand.push(block.pop_back().unwrap());
                         }
                         
                         for (first,second) in first_operand.iter().rev().zip(second_operand.iter().rev()){
                             match instruction_opcode{
-                                25 =>{stack.push_back(*first|*second)}
-                                27 =>{stack.push_back(*first&*second)}
-                                29 =>{stack.push_back(*first^*second)}
+                                25 =>{block.push_back(*first|*second)}
+                                27 =>{block.push_back(*first&*second)}
+                                29 =>{block.push_back(*first^*second)}
                                 _=>{}
                             }
                         }
@@ -772,47 +769,47 @@ impl VM{
                     }
                     30 => {
                         //pop front biwise not
-                        let mut N:u16 = ((stack.pop_front().unwrap() as u16)<<8)+stack.pop_front().unwrap() as u16;
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = ((block.pop_front().unwrap() as u16)<<8)+block.pop_front().unwrap() as u16;
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            operand.push(stack.pop_front().unwrap());
+                            operand.push(block.pop_front().unwrap());
                         }
                         
                         for byte in operand.iter().rev(){
-                            stack.push_front(!*byte);
+                            block.push_front(!*byte);
                         }
                     
                     }
                     31 => {
                         //pop back bitwise not
-                        let mut N:u16 = stack.pop_back().unwrap() as u16+((stack.pop_back().unwrap() as u16)<<8);
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = block.pop_back().unwrap() as u16+((block.pop_back().unwrap() as u16)<<8);
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
 
                         for i in 0..N{
-                            operand.push(stack.pop_back().unwrap());
+                            operand.push(block.pop_back().unwrap());
                         }
                         
                         for byte in operand.iter().rev(){
-                            stack.push_back(!*byte);
+                            block.push_back(!*byte);
                         }
                     
                     }
                     32 => {
                         // pop front shift left
-                        let mut N:u16 = ((stack.pop_front().unwrap() as u16)<<8)+stack.pop_front().unwrap() as u16;
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = ((block.pop_front().unwrap() as u16)<<8)+block.pop_front().unwrap() as u16;
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut S = buffer[instruction_index];
                         instruction_index += 1;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
                         for i in 0..N{
-                            operand.push(stack.pop_front().unwrap());
+                            operand.push(block.pop_front().unwrap());
                         }
 
                         if S < 8{
@@ -832,20 +829,20 @@ impl VM{
                         }
                         
                         for byte in operand.iter(){
-                            stack.push_front(*byte);
+                            block.push_front(*byte);
                         }
                     }
                     33 => {
                         // pop back shift left
-                        let mut N:u16 = stack.pop_back().unwrap() as u16+((stack.pop_back().unwrap() as u16)<<8);
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = block.pop_back().unwrap() as u16+((block.pop_back().unwrap() as u16)<<8);
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut S = buffer[instruction_index];
                         instruction_index += 1;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
                         for i in 0..N{
-                            operand.push(stack.pop_back().unwrap());
+                            operand.push(block.pop_back().unwrap());
                         }
 
                         let mut num = BigUint::from_bytes_le(&operand);
@@ -853,20 +850,20 @@ impl VM{
                         operand = num.to_bytes_be();
 
                         for byte in operand.iter(){
-                            stack.push_back(*byte);
+                            block.push_back(*byte);
                         }
                     }
                     34 => {
                         // pop front shift right
-                        let mut N:u16 = ((stack.pop_front().unwrap() as u16)<<8)+stack.pop_front().unwrap() as u16;
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = ((block.pop_front().unwrap() as u16)<<8)+block.pop_front().unwrap() as u16;
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut S = buffer[instruction_index];
                         instruction_index += 1;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
                         for i in 0..N{
-                            operand.push(stack.pop_front().unwrap());
+                            operand.push(block.pop_front().unwrap());
                         }
 
                         let mut num = BigUint::from_bytes_be(&operand);
@@ -874,21 +871,21 @@ impl VM{
                         operand = num.to_bytes_le();
                         
                         for byte in operand.iter(){
-                            stack.push_front(*byte);
+                            block.push_front(*byte);
                         }
 
                     }
                     35 => {
                         // pop back shift right
-                        let mut N:u16 = stack.pop_back().unwrap() as u16+((stack.pop_back().unwrap() as u16)<<8);
-                        N = 1 + N%bitwise_max_size;
+                        let mut N:u16 = block.pop_back().unwrap() as u16+((block.pop_back().unwrap() as u16)<<8);
+                        N = 1 + N%MAX_POP_SIZE_BITWISE as u16;
 
                         let mut S = buffer[instruction_index];
                         instruction_index += 1;
 
                         let mut operand:Vec<u8> = Vec::with_capacity(N as usize);
                         for i in 0..N{
-                            operand.push(stack.pop_back().unwrap());
+                            operand.push(block.pop_back().unwrap());
                         } 
 
                         let mut num = BigUint::from_bytes_le(&operand);
@@ -896,362 +893,378 @@ impl VM{
                         operand = num.to_bytes_be();
                         
                         for byte in operand.iter(){
-                            stack.push_back(*byte);
+                            block.push_back(*byte);
                         }
                     }
                     36 => {
                         // random address from front, sum
                         let mut address:u64 = 0;
                         for i in (0..8).rev(){
-                            let mut buf_num:u64 = stack.pop_front().unwrap() as u64;
+                            let mut buf_num:u64 = block.pop_front().unwrap() as u64;
                             buf_num = buf_num << (8*i);
                             address |= buf_num;
                         }
 
-                        address = (address as usize%(stack.len()-8)) as u64;
+                        address = (address as usize%(block.len()-8)) as u64;
                         
                         let mut first_operand:u32 = 0;
-                        first_operand |= (stack[address as usize] as u32)<<24;
+                        first_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<16;
+                        first_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<8;
+                        first_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        first_operand |= stack[address as usize] as u32;
+                        first_operand |= block[address as usize] as u32;
                         address += 1;
 
                         let mut second_operand:u32 = 0;
-                        second_operand |= (stack[address as usize] as u32)<<24;
+                        second_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<16;
+                        second_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<8;
+                        second_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        second_operand |= stack[address as usize] as u32;
+                        second_operand |= block[address as usize] as u32;
 
                         let result:u32 = first_operand+second_operand;
                         
-                        stack.push_front((result&0x000000ff) as u8);
-                        stack.push_front((result&0x0000ff00) as u8);
-                        stack.push_front((result&0x00ff0000) as u8);
-                        stack.push_front((result&0xff000000) as u8);
+                        block.push_front((result&0x000000ff) as u8);
+                        block.push_front((result&0x0000ff00) as u8);
+                        block.push_front((result&0x00ff0000) as u8);
+                        block.push_front((result&0xff000000) as u8);
 
                     }
                     37 => {
                         //random address from back, sum
                         let mut address:u64 = 0;
                         for i in 0..8{
-                            let mut buf_num:u64 = stack.pop_back().unwrap() as u64;
+                            let mut buf_num:u64 = block.pop_back().unwrap() as u64;
                             buf_num = buf_num << (8*i);
                             address |= buf_num;
                         }
 
-                        address = (address as usize%(stack.len()-8)) as u64;
+                        address = (address as usize%(block.len()-8)) as u64;
 
                         let mut first_operand:u32 = 0;
-                        first_operand |= (stack[address as usize] as u32)<<24;
+                        first_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<16;
+                        first_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<8;
+                        first_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        first_operand |= stack[address as usize] as u32;
+                        first_operand |= block[address as usize] as u32;
                         address += 1;
 
                         let mut second_operand:u32 = 0;
-                        second_operand |= (stack[address as usize] as u32)<<24;
+                        second_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<16;
+                        second_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<8;
+                        second_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        second_operand |= stack[address as usize] as u32;
+                        second_operand |= block[address as usize] as u32;
 
                         let result:u32 = first_operand+second_operand;
                         
-                        stack.push_back((result&0xff000000) as u8);
-                        stack.push_back((result&0x00ff0000) as u8);
-                        stack.push_back((result&0x0000ff00) as u8);
-                        stack.push_back((result&0x000000ff) as u8);
+                        block.push_back((result&0xff000000) as u8);
+                        block.push_back((result&0x00ff0000) as u8);
+                        block.push_back((result&0x0000ff00) as u8);
+                        block.push_back((result&0x000000ff) as u8);
                     }
                     38 => {
                         //random address from front, sub
                         let mut address:u64 = 0;
                         for i in (0..8).rev(){
-                            let mut buf_num:u64 = stack.pop_front().unwrap() as u64;
+                            let mut buf_num:u64 = block.pop_front().unwrap() as u64;
                             buf_num = buf_num << (8*i);
                             address |= buf_num;
                         }
 
-                        address = (address as usize%(stack.len()-8)) as u64;
+                        address = (address as usize%(block.len()-8)) as u64;
 
                         let mut first_operand:u32 = 0;
-                        first_operand |= (stack[address as usize] as u32)<<24;
+                        first_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<16;
+                        first_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<8;
+                        first_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        first_operand |= stack[address as usize] as u32;
+                        first_operand |= block[address as usize] as u32;
                         address += 1;
 
                         let mut second_operand:u32 = 0;
-                        second_operand |= (stack[address as usize] as u32)<<24;
+                        second_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<16;
+                        second_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<8;
+                        second_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        second_operand |= stack[address as usize] as u32;
+                        second_operand |= block[address as usize] as u32;
 
                         let result:u32 = unsafe{transmute(first_operand as i32 - second_operand as i32)};
                         
-                        stack.push_front((result&0x000000ff) as u8);
-                        stack.push_front((result&0x0000ff00) as u8);
-                        stack.push_front((result&0x00ff0000) as u8);
-                        stack.push_front((result&0xff000000) as u8);
+                        block.push_front((result&0x000000ff) as u8);
+                        block.push_front((result&0x0000ff00) as u8);
+                        block.push_front((result&0x00ff0000) as u8);
+                        block.push_front((result&0xff000000) as u8);
                     }
                     39 => {
                         //random address from back, sub
                         let mut address:u64 = 0;
                         for i in 0..8{
-                            let mut buf_num:u64 = stack.pop_back().unwrap() as u64;
+                            let mut buf_num:u64 = block.pop_back().unwrap() as u64;
                             buf_num = buf_num << (8*i);
                             address |= buf_num;
                         }
 
-                        address = (address as usize%(stack.len()-8)) as u64;
+                        address = (address as usize%(block.len()-8)) as u64;
 
                         let mut first_operand:u32 = 0;
-                        first_operand |= (stack[address as usize] as u32)<<24;
+                        first_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<16;
+                        first_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        first_operand |= (stack[address as usize] as u32)<<8;
+                        first_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        first_operand |= stack[address as usize] as u32;
+                        first_operand |= block[address as usize] as u32;
                         address += 1;
 
                         let mut second_operand:u32 = 0;
-                        second_operand |= (stack[address as usize] as u32)<<24;
+                        second_operand |= (block[address as usize] as u32)<<24;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<16;
+                        second_operand |= (block[address as usize] as u32)<<16;
                         address += 1;
-                        second_operand |= (stack[address as usize] as u32)<<8;
+                        second_operand |= (block[address as usize] as u32)<<8;
                         address += 1;
-                        second_operand |= stack[address as usize] as u32;
+                        second_operand |= block[address as usize] as u32;
 
                         let result:u32 = unsafe{transmute(first_operand as i32 - second_operand as i32)};
                         
-                        stack.push_back((result&0xff000000) as u8);
-                        stack.push_back((result&0x00ff0000) as u8);
-                        stack.push_back((result&0x0000ff00) as u8);
-                        stack.push_back((result&0x000000ff) as u8);
+                        block.push_back((result&0xff000000) as u8);
+                        block.push_back((result&0x00ff0000) as u8);
+                        block.push_back((result&0x0000ff00) as u8);
+                        block.push_back((result&0x000000ff) as u8);
                     }
                     40 => {
                         // aes128 encrypt front
                         let mut key_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes128::new(&key);
-                        cipher.encrypt_block(&mut block);
+                        cipher.encrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     41 => {
                         // aes128 decrypt front
                         let mut key_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes128::new(&key);
-                        cipher.decrypt_block(&mut block);
+                        cipher.decrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     42 => {
                         // aes192 encrypt front
                         let mut key_raw:[u8;24] = [0u8;24];
                         for i in 0..24{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes192::new(&key);
-                        cipher.encrypt_block(&mut block);
+                        cipher.encrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     43 => {
                         // aes192 decrypt front
                         let mut key_raw:[u8;24] = [0u8;24];
                         for i in 0..24{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes192::new(&key);
-                        cipher.decrypt_block(&mut block);
+                        cipher.decrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     44 => {
                         // aes256 encrypt front
                         let mut key_raw:[u8;32] = [0u8;32];
                         for i in 0..32{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes256::new(&key);
-                        cipher.encrypt_block(&mut block);
+                        cipher.encrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     45 => {
                         // aes256 decrypt front
                         let mut key_raw:[u8;32] = [0u8;32];
                         for i in 0..32{
-                            key_raw[i] = stack.pop_front().unwrap();
+                            key_raw[i] = block.pop_front().unwrap();
                         }
                         let key = GenericArray::from(key_raw);
                         
                         let mut block_raw:[u8;16] = [0u8;16];
                         for i in 0..16{
-                            key_raw[i] = stack.pop_back().unwrap();
+                            key_raw[i] = block.pop_back().unwrap();
                         }
 
-                        let mut block = GenericArray::from(block_raw);
+                        let mut block_aes = GenericArray::from(block_raw);
                         
                         let cipher = Aes256::new(&key);
-                        cipher.decrypt_block(&mut block);
+                        cipher.decrypt_block(&mut block_aes);
 
-                        for num in block.iter(){
-                            stack.push_front(*num);
+                        for num in block_aes.iter(){
+                            block.push_front(*num);
                         }
                     }
                     46 => {
                         // pop 4 bytes from back push to front
 
                         for _ in 0..4{
-                            let num  = stack.pop_back().unwrap();
-                            stack.push_front(num);
+                            let num  = block.pop_back().unwrap();
+                            block.push_front(num);
                         }
                     }
                     47 => {
                         // pop 4 bytes from back, push to final state
                         let mut value:u32 = 0;
 
-                        value |= stack.pop_back().unwrap() as u32;
-                        value |= (stack.pop_back().unwrap() as u32)<<8;
-                        value |= (stack.pop_back().unwrap() as u32)<<16;
-                        value |= (stack.pop_back().unwrap() as u32)<<24;
+                        value |= block.pop_back().unwrap() as u32;
+                        value |= (block.pop_back().unwrap() as u32)<<8;
+                        value |= (block.pop_back().unwrap() as u32)<<16;
+                        value |= (block.pop_back().unwrap() as u32)<<24;
 
                         self.final_state.push(value);
                     }
                     48 => {
                         let mut value:u32 = 0;
 
-                        value |= (stack.pop_front().unwrap() as u32)<<24;
-                        value |= (stack.pop_front().unwrap() as u32)<<16;
-                        value |= (stack.pop_front().unwrap() as u32)<<8;
-                        value |= stack.pop_front().unwrap() as u32;
+                        value |= (block.pop_front().unwrap() as u32)<<24;
+                        value |= (block.pop_front().unwrap() as u32)<<16;
+                        value |= (block.pop_front().unwrap() as u32)<<8;
+                        value |= block.pop_front().unwrap() as u32;
 
                         self.final_state.push(value);
                     }
                     _ =>{
-                        println!("Unknown instruction {} 
-                                    Last index: {}
-                                    Instruction pos: {}",
-                                    instruction_opcode,
-                                    instruction_index,
-                                    instruction_counter);
+                        // println!("Unknown instruction {} 
+                        //             Last index: {}
+                        //             Instruction pos: {}",
+                        //             instruction_opcode,
+                        //             instruction_index,
+                        //             instruction_counter);
                         return Err("Unknown instruction");
                     }
                 }
             }
+            
+            for byte in block.iter(){
+                stack[block_start] = *byte;
+                block_start += 1;
+            }
+
+            stack.drain(block_start..block_end);
+
+            if block_end >= stack.len(){
+                block_start = 0;
+            }
+            
+            println!("{:?}",stack.len());
+
         }
+        
 
         for i in 0..(stack.len()>>2){
             let mut value:u32 = 0;
-
-            value |= (stack.pop_front().unwrap() as u32)<<24;
-            value |= (stack.pop_front().unwrap() as u32)<<16;
-            value |= (stack.pop_front().unwrap() as u32)<<8;
-            value |= stack.pop_front().unwrap() as u32;
+            let index = i*4;
+            value |= (stack[i] as u32)<<24;
+            value |= (stack[i+1] as u32)<<16;
+            value |= (stack[i+2] as u32)<<8;
+            value |= stack[i+3] as u32;
 
             self.final_state.push(value);            
         }
 
-        if stack.len() != 0{
+        let rem = stack.len() % 4;
+        if rem != 0{
             let mut result:u32 = 0;
-            match stack.len(){
+            match rem{
                 1 => {
-                    result |= stack.pop_front().unwrap() as u32;
+                    result |= stack[stack.len()-1] as u32;
                 }
                 2 => {
-                    result |= (stack.pop_front().unwrap() as u32) << 8;
-                    result |= stack.pop_front().unwrap() as u32;                
+                    result |= stack[stack.len()-1] as u32;
+                    result |= (stack[stack.len()-2] as u32) << 8;
                 }
                 3 => {
-                    result |= (stack.pop_front().unwrap() as u32) << 16;
-                    result |= (stack.pop_front().unwrap() as u32) << 8;
-                    result |= stack.pop_front().unwrap() as u32;
+                    result |= stack[stack.len()-1] as u32;
+                    result |= (stack[stack.len()-2] as u32) << 8;
+                    result |= (stack[stack.len()-3] as u32) << 16;
                 }
-                _ =>{}
+                _ => {}
             }
             self.final_state.push(result);
-        }
+        }  
 
         return Ok(());
     }

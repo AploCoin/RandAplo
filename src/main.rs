@@ -20,45 +20,37 @@ fn main() {
                              0xff,0xff,0xff,0xff,0x00];
     let now = Instant::now();
     println!("Generating algorithm");
-    //let instructions_lookup = AlgorithmCreator::generate_lookup_table(&mut data.clone());
-    //println!("{:?}",instructions_lookup.len());
-    //println!("{:?}",instructions_lookup);
+
+    let BLOCK_SIZE:usize = 209715200;
+
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
-                                                    2147483648,
-                                                    1073741824/2,
-                                                    10000
+                                                    BLOCK_SIZE,
+                                                    1024,
+                                                    4000000,
+                                                    0,
+                                                    15
                                                 ).unwrap();
     println!("Algorithm generated seconds:{}", now.elapsed().as_secs());
-    println!("{:?}",algorithm.len());
-
-    //let instructions_lookup_table = AlgorithmProcessor::prepare_lookup_table(&instructions_lookup);
-
-    let bytes_size:[u8;8] = algorithm[0..8].try_into().unwrap();
-    let block_size = u64::from_be_bytes(bytes_size);
 
     let mut vm = AlgorithmProcessor::get_VM();
 
-    let mut stack:VecDeque<u8> = VecDeque::with_capacity((block_size/4) as usize);
+    let mut stack:Vec<u8> = Vec::with_capacity(2147483648);
 
     for i in 0..6{
-        stack.push_back(0xFA);
+        stack.push(0xFA);
     }
-    //stack[0] = 0xff;
     
     println!("Padding data...");
-    AlgorithmProcessor::pad_data(&mut stack, block_size);
-
-    //let mut stack_to_process = VecDeque::from_iter(stack);
+    AlgorithmProcessor::pad_data(&mut stack, 2147483648);
 
     println!("Executing algo");
     let now = Instant::now();
-    let res = vm.execute_from_buffer(&algorithm[8..], 
+    let res = vm.execute_from_buffer(&algorithm, 
                                     &mut stack,
-                                    1073741824/2,
-                                    false,
-                                    0);
+                                    BLOCK_SIZE,
+                                    1024,
+                                    1073741824);
     println!("Algorithm executed seconds:{}", now.elapsed().as_secs());
-    println!("{:?}",res);
 
     let mut digest:Vec<u8> = vm.digest();
     
