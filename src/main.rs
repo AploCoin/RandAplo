@@ -21,7 +21,7 @@ fn main() {
     let now = Instant::now();
     println!("Generating algorithm");
 
-    let BLOCK_SIZE:usize = 209715200;
+    let BLOCK_SIZE:usize = 104857600;
 
     let algorithm = AlgorithmCreator::create_algorithm(&mut data, 
                                                     BLOCK_SIZE,
@@ -37,7 +37,7 @@ fn main() {
     let mut stack:Vec<u8> = Vec::with_capacity(2147483648);
 
     for i in 0..6{
-        stack.push(0xFA);
+        stack.push(0xFB);
     }
     
     println!("Padding data...");
@@ -49,13 +49,13 @@ fn main() {
                                     &mut stack,
                                     BLOCK_SIZE,
                                     1024,
-                                    1073741824);
+                                    1073741824/2);
     println!("Algorithm executed seconds:{}", now.elapsed().as_secs());
 
     let mut digest:Vec<u8> = vm.digest();
     
     let mut hasher = Sha256::new();
-    hasher.update(digest);
+    hasher.update(&digest);
     let result = hasher.finalize();
     println!("{:?}",result);
     // println!("{:?}",digest.len());

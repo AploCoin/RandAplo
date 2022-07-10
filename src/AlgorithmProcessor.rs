@@ -1227,9 +1227,10 @@ impl VM{
 
             if block_end >= stack.len(){
                 block_start = 0;
+                println!("End reached");
             }
             
-            println!("{:?}",stack.len());
+            //println!("{:?}",stack.len());
 
         }
         
